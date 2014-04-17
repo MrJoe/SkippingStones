@@ -26,13 +26,13 @@
  *
  */
 
-#include "dbusofonoadapter.h"
+#include "dbusadapter.h"
 #include <QDebug>
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QVariant>
 
-DbusOfonoAdapter::DbusOfonoAdapter(QObject *parent) :
+DbusAdapter::DbusAdapter(QObject *parent) :
     QObject(parent)
 {
     QDBusConnection systemConn = QDBusConnection::systemBus();
@@ -42,6 +42,8 @@ DbusOfonoAdapter::DbusOfonoAdapter(QObject *parent) :
                          this, SLOT(_smsReceived(QDBusMessage)));
 
     QDBusConnection sessionConn = QDBusConnection::sessionBus();
+    sessionConn.connect("", "/", "org.coderus.harbour_mitakuuluu_server", "messageReceived",
+                        this, SLOT(_mitakuuluuMessageReceived(QDBusMessage)));
 
     qDebug() << "Setting up hack for getting notifications...";
     // The inspiration for this hack was taken from: http://stackoverflow.com/questions/22592042/qt-dbus-monitor-method-calls
@@ -53,7 +55,7 @@ DbusOfonoAdapter::DbusOfonoAdapter(QObject *parent) :
     qDebug() << "Leaving constructor...";
 }
 
-uint DbusOfonoAdapter::Notify(const QString &app_name, uint replaces_id, const QString &app_icon, const QString &summary, const QString &body, const QStringList &actions, const QVariantHash &hints, int expire_timeout) {
+uint DbusAdapter::Notify(const QString &app_name, uint replaces_id, const QString &app_icon, const QString &summary, const QString &body, const QStringList &actions, const QVariantHash &hints, int expire_timeout) {
     qDebug() << "Got notification via dbus from" << app_name;
 
     if (app_name == "messageserver5") {
@@ -62,10 +64,32 @@ uint DbusOfonoAdapter::Notify(const QString &app_name, uint replaces_id, const Q
         emit email(hints.value("x-nemo-preview-summary", "default").toString(),
                    hints.value("x-nemo-preview-body", "default").toString(),
                    hints.value("x-nemo.email.published-messages", "default").toString());
+    } else if (app_name == "commhistoryd") {
+        if (summary == "" && body == "") {
+            emit commhistoryd(hints.value("x-nemo-preview-summary", "default").toString(),
+                              hints.value("x-nemo-preview-body", "default").toString());
+        } else {
+            qDebug() << "Ignoring this commhistoryd message:" << summary << ";" << body << ";" << hints;
+        }
+    } else {
+        emit notify(app_name, summary, body);
     }
 }
 
-void DbusOfonoAdapter::_phoneCall(QDBusMessage msg) {
+void DbusAdapter::_mitakuuluuMessageReceived(QDBusMessage msg) {
+    qDebug() << "Mitakuuluu messageReceived:" << msg;
+
+    QDBusArgument *arg = (QDBusArgument *) msg.arguments().at(0).data();
+
+    if (arg->currentType() == QDBusArgument::MapType) {
+        QMap<QString, QString> argMap = unpackMessage(*arg);
+
+        qDebug() << "Extracted argument map:" << argMap;
+        emit commhistoryd(argMap.value("author"), argMap.value("message"));
+    }
+}
+
+void DbusAdapter::_phoneCall(QDBusMessage msg) {
     qDebug() << "Got phone call dbus message:" << msg;
 
     QDBusArgument *arg = (QDBusArgument *) msg.arguments().at(1).data();
@@ -74,11 +98,14 @@ void DbusOfonoAdapter::_phoneCall(QDBusMessage msg) {
         QMap<QString, QString> argMap = unpackMessage(*arg);
 
         qDebug() << "Extracted argument map:" << argMap;
-        emit phoneCall(argMap.value("LineIdentification"), argMap.value("Name"));
+
+        if (argMap.value("State") == "incoming") {
+            emit phoneCall(argMap.value("LineIdentification"), argMap.value("Name"));
+        }
     }
 }
 
-void DbusOfonoAdapter::_smsReceived(QDBusMessage msg) {
+void DbusAdapter::_smsReceived(QDBusMessage msg) {
     qDebug() << "Got sms dbus message:" << msg;
 
     QDBusArgument *arg = (QDBusArgument *) msg.arguments().at(1).data();
@@ -91,7 +118,7 @@ void DbusOfonoAdapter::_smsReceived(QDBusMessage msg) {
     }
 }
 
-QMap<QString, QString> DbusOfonoAdapter::unpackMessage(const QDBusArgument &arg) {
+QMap<QString, QString> DbusAdapter::unpackMessage(const QDBusArgument &arg) {
     QMap<QString, QString> argMap;
 
     arg.beginMap();

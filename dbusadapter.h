@@ -26,22 +26,24 @@
  *
  */
 
-#ifndef DBUSOFONOADAPTER_H
-#define DBUSOFONOADAPTER_H
+#ifndef DBUSADAPTER_H
+#define DBUSADAPTER_H
 
 #include <QObject>
 #include <QDBusMessage>
 #include <QDBusArgument>
 
-class DbusOfonoAdapter : public QObject
+class DbusAdapter : public QObject
 {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "org.freedesktop.Notifications")
 public:
-    explicit DbusOfonoAdapter(QObject *parent = 0);
+    explicit DbusAdapter(QObject *parent = 0);
 
 signals:
+    void commhistoryd(QString summary, QString body);
     void email(QString previewSummary, QString previewBody, QString publishedMessages);
+    void notify(QString appName, QString summary, QString body);
     void phoneCall(QString number, QString name);
     void smsReceived(QString messageText, QString sender);
 
@@ -49,6 +51,7 @@ public slots:
     uint Notify(const QString &app_name, uint replaces_id, const QString &app_icon, const QString &summary, const QString &body, const QStringList &actions, const QVariantHash &hints, int expire_timeout);
 
 private slots:
+    void _mitakuuluuMessageReceived(QDBusMessage msg);
     void _phoneCall(QDBusMessage msg);
     void _smsReceived(QDBusMessage msg);
 
@@ -57,4 +60,4 @@ private:
 
 };
 
-#endif // DBUSOFONOADAPTER_H
+#endif // DBUSADAPTER_H

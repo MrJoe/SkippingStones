@@ -8,7 +8,7 @@ SOURCES += \
     btmessage.cpp \
     filesystemhelper.cpp \
     settingsadapter.cpp \
-    dbusofonoadapter.cpp
+    dbusadapter.cpp
 
 OTHER_FILES += \
     rpm/harbour-skippingstones.spec \
@@ -24,6 +24,9 @@ HEADERS += \
     btmessage.h \
     filesystemhelper.h \
     settingsadapter.h \
-    dbusofonoadapter.h
+    dbusadapter.h
 
 QT += bluetooth dbus
+
+RESOURCES += \
+    sailfish_resources.qrc
